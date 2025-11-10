@@ -20,8 +20,8 @@ Below is the architecture of how Transpyler turns your custom syntax into Python
 
 ```text
 ┌────────────────────────┐
-│     Source Code (.tl)  │
-│  (your DSL language)   │
+│     Source Code (.rpy)  │
+│  (rpy language)   │
 └────────────┬───────────┘
              │
              ▼
@@ -31,28 +31,28 @@ Below is the architecture of how Transpyler turns your custom syntax into Python
 └────────────┬───────────┘
              │
              ▼
-┌────────────────────────┐
-│   Parser / AST Builder │
+┌─────────────────────────┐
+│   Parser / AST Builder  │
 │  Builds syntax tree     │
-└────────────┬───────────┘
+└────────────┬────────────┘
              │
              ▼
-┌────────────────────────┐
-│   AST Translator       │
+┌─────────────────────────┐
+│   AST Translator        │
 │ Converts nodes to Python│
-└────────────┬───────────┘
+└────────────┬────────────┘
              │
              ▼
-┌────────────────────────┐
-│  Python Code Generator │
+┌─────────────────────────┐
+│  Python Code Generator  │
 │ Writes runnable .py file│
-└────────────┬───────────┘
+└────────────┬────────────┘
              │
              ▼
-┌────────────────────────┐
-│    Python Interpreter  │
+┌──────────────────────────┐
+│    Python Interpreter    │
 │ Runs your transpiled code│
-└────────────────────────┘
+└──────────────────────────┘
 ```
 
 
