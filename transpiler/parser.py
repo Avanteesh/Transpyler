@@ -46,6 +46,7 @@ class Parser:
     def __init__(self, token_stream: list[Lexeme]):
         self.token_stream = token_stream
         self.index_ptr = 0
+        self.line_no = 1
         self.ast = None
     
     def __check_if_special_operator(self):
@@ -70,17 +71,17 @@ class Parser:
                     case "do": break
                     case "done": break
                     case "Null": 
-                        postfix.append(new_ast.NamedExp(name="Null"))
+                        postfix.append(new_ast.NamedExp(name="Null",line_no=self.line_no))
                         self.index_ptr += 1
                     case "True":
-                        postfix.append(new_ast.NamedExp(name="True"))
+                        postfix.append(new_ast.NamedExp(name="True",line_no=self.line_no))
                         self.index_ptr += 1
                     case "False":
-                        postfix.append(new_ast.NamedExp(name="False"))
+                        postfix.append(new_ast.NamedExp(name="False",line_no=self.line_no))
                     case "fun":
                         postfix.append(self.__parse_anonymous_fun())
             elif self.token_stream[self.index_ptr].lex_type == Grammar.NUMERIC_LITERAL or self.token_stream[self.index_ptr].lex_type == Grammar.STRING_LITERAL:
-                postfix.append(new_ast.Constant(value=self.token_stream[self.index_ptr].lexeme))
+                postfix.append(new_ast.Constant(value=self.token_stream[self.index_ptr].lexeme,line_no=self.line_no))
                 self.index_ptr += 1
             elif self.token_stream[self.index_ptr].lex_type == Grammar.NAME:
                 if self.token_stream[self.index_ptr + 1].lex_type == Grammar.LEFT_BRACE:
@@ -90,7 +91,7 @@ class Parser:
                     attribute = self.__parse_attributenode()
                     postfix.append(attribute)
                 else:
-                    literal = new_ast.NamedExp(name=self.token_stream[self.index_ptr].lexeme)
+                    literal = new_ast.NamedExp(name=self.token_stream[self.index_ptr].lexeme,line_no=self.line_no)
                     postfix.append(literal)
                     self.index_ptr += 1
             elif self.token_stream[self.index_ptr].lex_type == Grammar.LEFT_BRACE:
@@ -121,38 +122,38 @@ class Parser:
                 self.index_ptr += 1
         while len(stack) != 0:
             postfix.append(stack.pop())
-        res_expression = new_ast.Expr()
+        res_expression = new_ast.Expr(line_no=self.line_no)
         for tokens in postfix:
             if isinstance(tokens, new_ast.Constant) == True or isinstance(tokens, new_ast.NamedExp) == True or isinstance(tokens, new_ast.FunctionCall) or isinstance(tokens, new_ast.AnonymousFuncExp) or isinstance(tokens, new_ast.Attribute) or isinstance(tokens, new_ast.ListObj):
                 stack.append(tokens)
             elif tokens == Grammar.PLUS_OP or tokens == Grammar.MINUS_OP or tokens == Grammar.POWER_OP or tokens == Grammar.PRODUCT_OP or tokens == Grammar.MODULO_OP or tokens == Grammar.DIVISION_OP or tokens == Grammar.FLOOR_DIV_OP or tokens == Grammar.BITWISE_AND or tokens == Grammar.BITWISE_XOR or tokens == Grammar.BITWISE_OR or tokens == Grammar.L_SHIFT_OP or tokens == Grammar.R_SHIFT_OP or tokens == Grammar.NULL_COAL:
                 first, second = stack.pop(), stack.pop()
-                binexp = new_ast.BinaryExp(op=tokens,left=second,right=first)
+                binexp = new_ast.BinaryExp(op=tokens,left=second,right=first,line_no=self.line_no)
                 stack.append(binexp)
             elif tokens == Grammar.UNARY_FLIP or tokens == Grammar.UNARY_PLUS_OP or tokens == Grammar.UNARY_MINUS_OP or tokens == Grammar.LOGICAL_NOT:
                 operand = stack.pop()
-                unaryexp = new_ast.UnaryExp(op=tokens,operand=operand)
+                unaryexp = new_ast.UnaryExp(op=tokens,operand=operand,line_no=self.line_no)
                 stack.append(unaryexp)
             elif tokens == Grammar.LOGICAL_AND or tokens == Grammar.LOGICAL_OR:
                 first, second = stack.pop(), stack.pop()
-                boolexp = new_ast.BooleanExp(tokens,left=second,right=first)
+                boolexp = new_ast.BooleanExp(tokens,left=second,right=first,line_no=self.line_no)
                 stack.append(boolexp)
             elif check_if_comparision_op(tokens):
                 first, second, compareexp = stack.pop(), stack.pop(), None
                 if isinstance(second, new_ast.ComparatorExp):
-                    compareexp = new_ast.ComparatorExp(tokens,left=first)
+                    compareexp = new_ast.ComparatorExp(tokens,left=first,line_no=self.line_no)
                     compareexp.op += second.op 
                     compareexp.comparator = [*second.comparator,second.left]
                 else:
-                    compareexp = new_ast.ComparatorExp(tokens,left=second)
+                    compareexp = new_ast.ComparatorExp(tokens,left=second,line_no=self.line_no)
                     compareexp.comparator.append(first)
                 stack.append(compareexp)
         res_expression.value = stack.pop()
         return res_expression
 
     def __parse_function_call(self):
-        name_exp = new_ast.NamedExp(self.token_stream[self.index_ptr].lexeme)
-        functioncall = new_ast.FunctionCall(name_exp)
+        name_exp = new_ast.NamedExp(self.token_stream[self.index_ptr].lexeme,self.line_no)
+        functioncall = new_ast.FunctionCall(name_exp, self.line_no)
         self.index_ptr += 2
         while True:
             if self.token_stream[self.index_ptr].lex_type == Grammar.COMMA:
@@ -177,7 +178,7 @@ class Parser:
 
     def __parse_anonymous_fun(self) -> new_ast.AnonymousFuncExp:
         self.index_ptr += 1
-        anonymousfn = new_ast.AnonymousFuncExp()
+        anonymousfn = new_ast.AnonymousFuncExp(self.line_no)
         while True:
             if self.token_stream[self.index_ptr].lexeme == "do":
                 break
@@ -186,7 +187,7 @@ class Parser:
             elif self.token_stream[self.index_ptr].lex_type == Grammar.NAME:
                 if self.token_stream[self.index_ptr + 1].lex_type == Grammar.COMMA or self.token_stream[self.index_ptr + 1].lexeme == "do":
                     argobj = new_ast.ArgumentObject(
-                      self.token_stream[self.index_ptr].lexeme
+                      self.token_stream[self.index_ptr].lexeme,self.line_no
                     )
                     anonymousfn.arg_list.append(argobj)
                     self.index_ptr += 1
@@ -199,9 +200,9 @@ class Parser:
         return anonymousfn
 
     def __parse_assignment_exp(self) -> new_ast.AssignmentExpr:
-        assignexp = new_ast.AssignmentExpr()
+        assignexp = new_ast.AssignmentExpr(self.line_no)
         if self.token_stream[self.index_ptr + 1].lex_type == Grammar.ASSIGNMENT_OP:
-            name = new_ast.NamedExp(self.token_stream[self.index_ptr].lexeme)
+            name = new_ast.NamedExp(self.token_stream[self.index_ptr].lexeme,self.line_no)
             assignexp.target.append(name)
             self.index_ptr += 2
             expr = self.__parse_expression()
@@ -210,7 +211,7 @@ class Parser:
         else:
             while self.token_stream[self.index_ptr].lex_type != Grammar.ASSIGNMENT_OP:
                 if self.token_stream[self.index_ptr].lex_type == NAME:
-                    name = new_ast.NamedExp(self.token_stream[self.index_ptr].lexeme)
+                    name = new_ast.NamedExp(self.token_stream[self.index_ptr].lexeme, self.line_no)
                     assignexp.target.append(name)
                     self.index_ptr += 1
                 elif self.token_stream[self.index_ptr].lex_type == COMMA:
@@ -226,7 +227,7 @@ class Parser:
 
     def __parse_listexp(self) -> new_ast.ListObj:
         self.index_ptr += 1
-        lis_obj = new_ast.ListObj()
+        lis_obj = new_ast.ListObj(self.line_no)
         while True:
             if self.token_stream[self.index_ptr].lex_type == Grammar.LIST_RIGHT_BRACE:
                 self.index_ptr += 1
@@ -240,7 +241,7 @@ class Parser:
 
     def __parse_ifstatement(self) -> new_ast.IfStatement:
         self.index_ptr += 1
-        ifstatement = new_ast.IfStatement(self.__parse_expression())
+        ifstatement = new_ast.IfStatement(self.__parse_expression(),self.line_no)
         if self.token_stream[self.index_ptr].lexeme != "do":
             print(f"LexicalError: missing token do after if condition!")
             sys.exit(-1)
@@ -258,7 +259,7 @@ class Parser:
 
     def __parse_until_loop(self) -> new_ast.UntilLoop:
         self.index_ptr += 1
-        until_loop = new_ast.UntilLoop(condition=self.__parse_expression())
+        until_loop = new_ast.UntilLoop(condition=self.__parse_expression(),line_no=self.line_no)
         if self.token_stream[self.index_ptr].lexeme != "do":
             print(f"LexicalError: missing token do after if condition!")
             sys.exit(-1)
@@ -275,7 +276,7 @@ class Parser:
             if not name[0].isupper():
                 print("LexicalError: enum declarations must be in upper case only!")
                 sys.exit(-1)
-            enumdef = new_ast.EnumDef(name=name)
+            enumdef = new_ast.EnumDef(name=name,line_no=self.line_no)
             if self.token_stream[self.index_ptr + 2].lexeme != "do":
                 print("LexicalError: missing 'do' statement!")
                 sys.exit(-1)
@@ -314,7 +315,7 @@ class Parser:
         if not name[0].isupper():
             print("LexicalError: struct name should be capitalized!")
             sys.exit(-1)
-        structdef = new_ast.StructDef(name, mutable)
+        structdef = new_ast.StructDef(name, mutable,self.line_no)
         if self.token_stream[self.index_ptr + 1].lexeme != "do":
             print("LexicalError: missing 'do' statement!")
             sys.exit(-1)
@@ -334,11 +335,13 @@ class Parser:
                     self.index_ptr += 1
             elif self.token_stream[self.index_ptr].lex_type == Grammar.LINE_END:
                 self.index_ptr += 1
+                self.line_no += 1
         return structdef
 
     def __parse_attributenode(self) -> new_ast.Attribute:
         attribute_node = new_ast.Attribute(
-          value=new_ast.NamedExp(name=self.token_stream[self.index_ptr].lexeme)
+          value=new_ast.NamedExp(name=self.token_stream[self.index_ptr].lexeme,line_no=self.line_no),
+          line_no=self.line_no
         )
         if self.token_stream[self.index_ptr + 2].lex_type == Grammar.NAME:
             if self.token_stream[self.index_ptr + 3].lex_type == Grammar.DOT:
@@ -366,7 +369,7 @@ class Parser:
 
     def __parse_exit_call(self) -> new_ast.Exit:
         self.index_ptr += 1
-        exit_call = new_ast.Exit()
+        exit_call = new_ast.Exit(line_no=self.line_no)
         if self.token_stream[self.index_ptr].lex_type == Grammar.SEMICOLON or self.token_stream[self.index_ptr].lex_type == Grammar.LINE_END:
             return exit_call
         exit_call.call_arg = self.__parse_expression()
@@ -374,7 +377,7 @@ class Parser:
 
     def __parse_fromimport(self) -> new_ast.FromImport:
         self.index_ptr += 1 
-        moduleobj = new_ast.FromImport(module='')
+        moduleobj = new_ast.FromImport(module='', line_no=self.line_no)
         while True:
             if self.token_stream[self.index_ptr].lexeme == "import":
                 self.index_ptr += 1
@@ -392,18 +395,18 @@ class Parser:
             if self.token_stream[self.index_ptr].lex_type == Grammar.SEMICOLON or self.token_stream[self.index_ptr].lex_type == Grammar.LINE_END:
                 break
             elif self.token_stream[self.index_ptr].lex_type == Grammar.NAME:
-                moduleobj.names.append(new_ast.NamedExp(name=self.token_stream[self.index_ptr].lexeme))
+                moduleobj.names.append(new_ast.NamedExp(name=self.token_stream[self.index_ptr].lexeme,line_no=self.line_no))
                 self.index_ptr += 1
             elif self.token_stream[self.index_ptr].lex_type == Grammar.COMMA:
                 self.index_ptr += 1
         return moduleobj
 
     def __parse_functiondef(self) -> new_ast.FunctionDef:
-        fdef = new_ast.FunctionDef(function_name='')
+        fdef = new_ast.FunctionDef(function_name='', line_no=self.line_no)
         if self.token_stream[self.index_ptr + 1].lex_type == Grammar.NAME:
             name = self.token_stream[self.index_ptr + 1]
             if name.lexeme.islower() or name.lexeme[0] == '_':
-                fdef.function_name = new_ast.NamedExp(name.lexeme)
+                fdef.function_name = new_ast.NamedExp(name.lexeme, self.line_no)
             else:
                 print(f"LexicalError: function name must be a lower case alphabet!")
                 sys.exit(-1)
@@ -448,7 +451,7 @@ class Parser:
                     attribute = new_ast.Expr(self.__parse_attribute_node())
                     body.append(attribute)
             elif self.token_stream[self.index_ptr].lex_type == Grammar.LINE_END:
-                body.append(Grammar.LINE_END)
+                self.line_no += 1
                 self.index_ptr += 1
             elif self.token_stream[self.index_ptr].lex_type == Grammar.RESERVED_NAME:
                 match self.token_stream[self.index_ptr].lexeme:
@@ -471,10 +474,10 @@ class Parser:
                     case "until":
                         body.append(self.__parse_until_loop())
                     case "break":
-                        body.append(new_ast.Break())
+                        body.append(new_ast.Break(self.line_no))
                         self.index_ptr += 1
                     case "continue":
-                        body.append(new_ast.Continue())
+                        body.append(new_ast.Continue(self.line_no))
                         self.index_ptr += 1
                     case "exit":
                         body.append(self.__parse_exit_call())

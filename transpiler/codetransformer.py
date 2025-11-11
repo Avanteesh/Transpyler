@@ -33,7 +33,6 @@ class CodeTransformer:
     def __init__(self, file, execution_mode: Execution):
         self.file = file
         self.p_ast = None
-        self.line_no = 1
         self.execution_mode = execution_mode
         self.env = {
           "__builtins__": CodeTransformer.__mod_builtins__,
@@ -48,10 +47,10 @@ class CodeTransformer:
         }
 
     def __transform_name(self, n_ast: new_ast.NamedExp) -> ast.Name:
-        return ast.Name(id=n_ast.name,lineno=self.line_no)
+        return ast.Name(id=n_ast.name,lineno=n_ast.line_no)
 
     def __transform_constant(self, n_ast: new_ast.Constant) -> ast.Constant:
-        return ast.Constant(value=n_ast.value,lineno=self.line_no)
+        return ast.Constant(value=n_ast.value,lineno=n_ast.line_no)
 
     def __transform_unary_operator(self, operator):
         match operator:
@@ -123,7 +122,7 @@ class CodeTransformer:
           values=[
             self.__transform_expression(n_ast.left), 
             self.__transform_expression(n_ast.right)
-          ],lineno=self.line_no
+          ],lineno=n_ast.line_no
         )
 
     def __transform_compareexp(self, n_ast: new_ast.ComparatorExp) -> ast.Compare:
@@ -131,18 +130,18 @@ class CodeTransformer:
           left=self.__transform_expression(n_ast.left),
           ops=[self.__transform_compare_op(op) for op in n_ast.op],
           comparators=[self.__transform_expression(exp) for exp in n_ast.comparator],
-          lineno=self.line_no
+          lineno=n_ast.line_no
         )
 
     def __transform_unaryexp(self, n_ast: new_ast.UnaryExp) -> ast.UnaryOp:
         return ast.UnaryOp(
           op=self.__transform_unary_operator(n_ast.op),
           operand=self.__transform_expression(n_ast.operand),
-          lineno=self.line_no
+          lineno=n_ast.line_no
         )
 
     def __transform_listexp(self, n_ast: new_ast.ListObj) -> ast.List:
-        lis_obj = ast.List(elts=[],lineno=self.line_no)
+        lis_obj = ast.List(elts=[],lineno=n_ast.line_no)
         for items in n_ast.elts:
             lis_obj.elts.append(self.__transform_expression(items))
         return lis_obj
@@ -164,16 +163,16 @@ class CodeTransformer:
           op=self.__transform_binary_arithmatic_operator(n_ast.op),
           left=self.__transform_expression(n_ast.left), 
           right=self.__transform_expression(n_ast.right),
-          lineno=self.line_no
+          lineno=n_ast.line_no
         )
 
     def __transform_attribute(self, n_ast: new_ast.Attribute) -> ast.Attribute:
-        pyattribute = ast.Attribute(value=None,attr=n_ast.attr,lineno=self.line_no)
+        pyattribute = ast.Attribute(value=None,attr=n_ast.attr,lineno=n_ast.line_no)
         pyattribute.value = self.__transform_expression(n_ast.value)
         return pyattribute
     
     def __transform_assign_exp(self, n_ast: new_ast.AssignmentExpr) -> ast.Assign:
-        py_assign = ast.Assign(targets=[],value=None,lineno=self.line_no)
+        py_assign = ast.Assign(targets=[],value=None,lineno=n_ast.line_no)
         if len(n_ast.target) == 1:
             py_assign.targets.append(self.__transform_name(n_ast.target[0]))
             py_assign.value = self.__transform_expression(n_ast.value[0])
@@ -182,7 +181,7 @@ class CodeTransformer:
     def __transform_call(self, n_ast: new_ast.FunctionCall) -> ast.Call:
         call_object = ast.Call(
           func=self.__transform_expression(n_ast.function_name),
-          args=[],keywords=[],lineno=self.line_no
+          args=[],keywords=[],lineno=n_ast.line_no
         )
         for args in n_ast.arguments:
             transformed = self.__transform_expression(args)
@@ -192,7 +191,7 @@ class CodeTransformer:
     def __transform_returnobj(self, node: new_ast.Return) -> ast.Return:
         return ast.Return(
          value=self.__transform_expression(node.value),
-         lineno=self.line_no
+         lineno=node.line_no
         )
 
     def __transform_functiondef(self, node: new_ast.FunctionDef) -> ast.FunctionDef:
@@ -201,17 +200,17 @@ class CodeTransformer:
         )
         fdef = ast.FunctionDef(
          name=node.function_name.name,args=argument_list,
-         decorator_list=[],body=[],lineno=self.line_no
+         decorator_list=[],body=[],lineno=node.line_no
         )
         for argz in node.arg_list:
-            fdef.args.args.append(ast.arg(argz.arg_name,lineno=self.line_no))
+            fdef.args.args.append(ast.arg(argz.arg_name,lineno=node.line_no))
         fdef.body = self.__transform_tree_body(node.body)
         return fdef
     
     def __transform_ifcond(self, node: new_ast.IfStatement) -> ast.If:
         ifst = ast.If(
           test=self.__transform_expression(node.condition),
-          body=[],orelse=[],lineno=self.line_no
+          body=[],orelse=[],lineno=node.line_no
         )
         self.line_no += 1
         ifst.body = self.__transform_tree_body(node.body)
@@ -225,7 +224,7 @@ class CodeTransformer:
     def __transform_until_loop(self, node: new_ast.UntilLoop) -> ast.While:
         while_loop = ast.While(
           test=self.__transform_expression(node.condition),
-          body=[],orelse=[],lineno=self.line_no
+          body=[],orelse=[],lineno=node.line_no
         )
         while_loop.body = self.__transform_tree_body(node.body)
         return while_loop
@@ -234,17 +233,17 @@ class CodeTransformer:
         classdef = ast.ClassDef(
           name=node.enum_name,bases=[ast.Name(id='Enum')],
           keywords=[],body=[],decorator_list=[],type_params=[],
-          lineno=self.line_no
+          lineno=node.line_no
         )
-        self.line_no += 1
+        line_no = node.line_no + 1
         for constant, value in zip(node.constants, node.values):
             assign_obj = ast.Assign(
               targets=[self.__transform_expression(constant)],
               value=self.__transform_expression(value),
-              lineno=self.line_no
+              lineno=line_no
             )
             classdef.body.append(assign_obj)
-            self.line_no += 1
+            line_no += 1
         return classdef
 
     def __transform_structdef(self, node: new_ast.StructDef) -> ast.ClassDef:
@@ -257,13 +256,13 @@ class CodeTransformer:
             )
         classdef = ast.ClassDef(
           name=node.struct_name,bases=[],keywords=[],body=[],
-          decorator_list=[decorator],type_params=[],lineno=self.line_no
+          decorator_list=[decorator],type_params=[],lineno=node.line_no
         )
-        self.line_no += 1
+        line_no = node.line_no + 1
         for _vars, value in zip(node.variables, node.values):
             assign_obj = ast.AnnAssign(
               target=ast.Name(id=_vars),value=None,
-              annotation=ast.Name(id='Any'),simple=1,lineno=self.line_no
+              annotation=ast.Name(id='Any'),simple=1,lineno=line_no
             )
             if value is not None:
                 assign_obj.value = self.__transform_expression(value)
@@ -273,7 +272,7 @@ class CodeTransformer:
                   keywords=[ast.keyword(arg='default_factory',value=ast.Constant(value=null()))]
                 )
             classdef.body.append(assign_obj)
-            self.line_no += 1
+            line_no += 1
         return classdef
 
     def __transform_fromimport(self, node: new_ast.FromImport) -> None:
@@ -304,7 +303,7 @@ class CodeTransformer:
           value=ast.Call(
             func=ast.Name(id='exit'),args=[self.__transform_expression(node.call_arg)],
             keywords=[]
-          ),lineno=self.line_no
+          ),lineno=node.line_no
         )
 
     def __transform_anonymousfn(self, node: new_ast.AnonymousFuncExp) -> ast.Lambda:
@@ -313,7 +312,7 @@ class CodeTransformer:
           args=[],posonlyargs=[],kwonlyargs=[],
           kw_defauts=[],defaults=[]
          ),
-         body=None,lineno=self.line_no
+         body=None,lineno=node.line_no
         )
         for args in node.arg_list:
             arg_obj = ast.arg(arg=args.arg_name)
@@ -324,19 +323,15 @@ class CodeTransformer:
     def __transform_tree_body(self, n_ast: list[new_ast.NewAST]):
         body = []
         for node in n_ast:
-            if node == Grammar.LINE_END:
-                self.line_no += 1
-            elif isinstance(node, new_ast.AssignmentExpr):
+            if isinstance(node, new_ast.AssignmentExpr):
                 body.append(self.__transform_assign_exp(node))
             elif isinstance(node, new_ast.Expr):
                 expression = self.__transform_expression(node)
-                body.append(ast.Expr(expression,lineno=self.line_no))
-                self.line_no += 1
+                body.append(ast.Expr(expression,lineno=node.line_no))
             elif isinstance(node, new_ast.FunctionDef):
                 body.append(self.__transform_functiondef(node))
             elif isinstance(node, new_ast.Return):
                 body.append(self.__transform_returnobj(node))
-                self.line_no += 1
             elif isinstance(node, new_ast.IfStatement):
                 body.append(self.__transform_ifcond(node))
             elif isinstance(node, new_ast.EnumDef):
@@ -347,16 +342,12 @@ class CodeTransformer:
                 self.__transform_fromimport(node)
             elif isinstance(node, new_ast.Break):
                 body.append(ast.Break())
-                self.line_no += 1
             elif isinstance(node, new_ast.Continue):
                 body.append(ast.Continue())
-                self.line_no += 1
             elif isinstance(node, new_ast.StructDef):
                 body.append(self.__transform_structdef(node))
-                self.line_no += 1
             elif isinstance(node, new_ast.Exit):
                 body.append(self.__transform_exit_call(node))
-                self.line_no += 1
         return body
 
     def __node_transform(self, n_ast: new_ast.Module):
